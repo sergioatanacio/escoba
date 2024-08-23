@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación de Barrido Avanzada</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+        #controles {
+            margin-top: 10px;
+        }
+        button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="info">Usa las flechas para mover la escoba. Flecha arriba: avanzar, Izquierda/Derecha: girar. Presiona ESPACIO para cargar/soltar mueble. Cuando cargas un mueble, usa las flechas para moverlo directamente.</div>
+    <div id="controles">
+        <button onclick="agregarMueble('Mesa')">Añadir Mesa</button>
+        <button onclick="agregarMueble('Sofá')">Añadir Sofá</button>
+        <button onclick="agregarMueble('Cama')">Añadir Cama</button>
+        <button onclick="agregarMueble('Armario')">Añadir Armario</button>
+        <button onclick="agregarMueble('Tacho')">Añadir Tacho</button>
+        <button onclick="agregarMueble('Refrigerador')">Añadir Refrigerador</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let escoba = { x: 400, y: 300, width: 20, height: 40, angle: 0, speed: 3 };
+        let basura = [];
+        let muebles = [];
+        let pisoLimpio = new Array(80).fill().map(() => new Array(60).fill(false));
+        let muebleCargado = null;
+        let teclas = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+        const coloresMuebles = {
+            'Mesa': '#8B4513',
+            'Sofá': '#4682B4',
+            'Cama': '#DA70D6',
+            'Armario': '#556B2F',
+            'Tacho': '#708090',
+            'Refrigerador': '#B0E0E6'
+        };
+
+        function agregarMueble(tipo) {
+            muebles.push({
+                x: Math.random() * (canvas.width - 60),
+                y: Math.random() * (canvas.height - 60),
+                width: 60,
+                height: 60,
+                tipo: tipo
+            });
+        }
+
+        function generarMuebles() {
+            muebles = [];
+            Object.keys(coloresMuebles).forEach(tipo => agregarMueble(tipo));
+        }
+
+        function generarBasura() {
+            basura = [];
+            for (let i = 0; i < 20; i++) {
+                basura.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: 5
+                });
+            }
+            pisoLimpio = new Array(80).fill().map(() => new Array(60).fill(false));
+        }
+
+        function dibujar() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar piso
+            for (let x = 0; x < 80; x++) {
+                for (let y = 0; y < 60; y++) {
+                    ctx.fillStyle = pisoLimpio[x][y] ? 'white' : 'lightgray';
+                    ctx.fillRect(x * 10, y * 10, 10, 10);
+                }
+            }
+
+            // Dibujar muebles
+            muebles.forEach(mueble => {
+                ctx.fillStyle = mueble === muebleCargado ? 'orange' : coloresMuebles[mueble.tipo];
+                ctx.fillRect(mueble.x, mueble.y, mueble.width, mueble.height);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(mueble.tipo, mueble.x + mueble.width/2, mueble.y + mueble.height/2);
+            });
+
+            // Dibujar basura
+            ctx.fillStyle = 'gray';
+            basura.forEach(b => {
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Dibujar escoba
+            ctx.save();
+            ctx.translate(escoba.x, escoba.y);
+            ctx.rotate(escoba.angle);
+            ctx.fillStyle = 'black';
+            ctx.fillRect(-escoba.width / 2, -escoba.height / 2, escoba.width, escoba.height);
+            ctx.restore();
+        }
+
+        function mover() {
+            if (muebleCargado) {
+                moverMuebleCargado();
+            } else {
+                moverEscoba();
+            }
+            barrer();
+        }
+
+        function moverEscoba() {
+            if (teclas.ArrowUp) {
+                let newX = escoba.x + Math.cos(escoba.angle) * escoba.speed;
+                let newY = escoba.y + Math.sin(escoba.angle) * escoba.speed;
+                if (newX > 0 && newX < canvas.width && newY > 0 && newY < canvas.height) {
+                    escoba.x = newX;
+                    escoba.y = newY;
+                }
+            }
+            if (teclas.ArrowLeft) escoba.angle -= 0.05;
+            if (teclas.ArrowRight) escoba.angle += 0.05;
+        }
+
+        function moverMuebleCargado() {
+            const velocidad = 3;
+            let newX = muebleCargado.x;
+            let newY = muebleCargado.y;
+
+            if (teclas.ArrowUp) newY = Math.max(0, muebleCargado.y - velocidad);
+            if (teclas.ArrowDown) newY = Math.min(canvas.height - muebleCargado.height, muebleCargado.y + velocidad);
+            if (teclas.ArrowLeft) newX = Math.max(0, muebleCargado.x - velocidad);
+            if (teclas.ArrowRight) newX = Math.min(canvas.width - muebleCargado.width, muebleCargado.x + velocidad);
+
+            muebleCargado.x = newX;
+            muebleCargado.y = newY;
+        }
+
+        function barrer() {
+            basura = basura.filter(b => {
+                let distancia = Math.sqrt((b.x - escoba.x) ** 2 + (b.y - escoba.y) ** 2);
+                return distancia > 20;
+            });
+
+            // Limpiar el piso
+            for (let x = Math.max(0, Math.floor(escoba.x / 10) - 2); x < Math.min(80, Math.floor(escoba.x / 10) + 4); x++) {
+                for (let y = Math.max(0, Math.floor(escoba.y / 10) - 2); y < Math.min(60, Math.floor(escoba.y / 10) + 6); y++) {
+                    pisoLimpio[x][y] = true;
+                }
+            }
+
+            if (basura.length === 0 && pisoLimpio.every(row => row.every(cell => cell))) {
+                generarBasura();
+            }
+        }
+
+        function colision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        function cargarSoltarMueble() {
+            if (muebleCargado) {
+                muebleCargado = null;
+            } else {
+                muebleCargado = muebles.find(mueble => colision(escoba, mueble));
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key in teclas) {
+                teclas[e.key] = true;
+            }
+            if (e.key === ' ') { // Espacio
+                cargarSoltarMueble();
+                e.preventDefault(); // Prevenir el comportamiento por defecto del espacio
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key in teclas) teclas[e.key] = false;
+        });
+
+        function gameLoop() {
+            mover();
+            dibujar();
+            requestAnimationFrame(gameLoop);
+        }
+
+        generarMuebles();
+        generarBasura();
+        gameLoop();
+    </script>
+</body>
+</html>
